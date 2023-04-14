@@ -12,6 +12,7 @@ import model
 import dataloader
 import platform
 from tqdm import tqdm
+import numpy as np
 
 # For parsing commandline arguments
 parser = argparse.ArgumentParser()
