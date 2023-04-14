@@ -12,9 +12,6 @@ import model
 import dataloader
 import platform
 from tqdm import tqdm
-import numpy as np
-import tensorflow as tf
-
 
 # For parsing commandline arguments
 parser = argparse.ArgumentParser()
@@ -175,22 +172,22 @@ def main():
 
     # Interpolate frames
     frameCounter = 1
-    idx=0
+
     with torch.no_grad():
         for _, (frame0, frame1) in enumerate(tqdm(videoFramesloader), 0):
-            idx=idx+1
+
             I0 = frame0.to(device)
             I1 = frame1.to(device)
 
             flowOut = flowComp(torch.cat((I0, I1), dim=1))
             F_0_1 = flowOut[:,:2,:,:]
             F_1_0 = flowOut[:,2:,:,:]
-            
+
             # Save reference frames in output folder
             for batchIndex in range(args.batch_size):
-                (TP(frame0[batchIndex].detach())).resize(videoFrames.origDim, Image.BILINEAR).save(os.path.join(outputPath, str(frameCounter + args.sf * batchIndex) + ".png"))
+                (TP(frame0[batchIndex].detach())).resize(videoFrames.origDim, Image.BILINEAR).save(os.path.join(outputPath, str(frameCounter + args.sf * batchIndex).zfill(8) + ".png"))
             frameCounter += 1
-            
+
             # Generate intermediate frames
             for intermediateIndex in range(1, args.sf):
                 t = float(intermediateIndex) / args.sf
@@ -200,19 +197,13 @@ def main():
                 F_t_0 = fCoeff[0] * F_0_1 + fCoeff[1] * F_1_0
                 F_t_1 = fCoeff[2] * F_0_1 + fCoeff[3] * F_1_0
 
-               
-
                 g_I0_F_t_0 = flowBackWarp(I0, F_t_0)
                 g_I1_F_t_1 = flowBackWarp(I1, F_t_1)
 
                 intrpOut = ArbTimeFlowIntrp(torch.cat((I0, I1, F_0_1, F_1_0, F_t_1, F_t_0, g_I1_F_t_1, g_I0_F_t_0), dim=1))
 
-                sx,sy=videoFrames.origDim
-
                 F_t_0_f = intrpOut[:, :2, :, :] + F_t_0
                 F_t_1_f = intrpOut[:, 2:4, :, :] + F_t_1
-            
-
                 V_t_0   = torch.sigmoid(intrpOut[:, 4:5, :, :])
                 V_t_1   = 1 - V_t_0
 
@@ -223,8 +214,7 @@ def main():
 
                 Ft_p = (wCoeff[0] * V_t_0 * g_I0_F_t_0_f + wCoeff[1] * V_t_1 * g_I1_F_t_1_f) / (wCoeff[0] * V_t_0 + wCoeff[1] * V_t_1)
 
-
-                # Save intermediate frame
+                 # Save intermediate frame
                 for batchIndex in range(args.batch_size):
                     temp=(TP(Ft_p[batchIndex].cpu().detach())).resize(videoFrames.origDim, Image.BILINEAR)
                     temp.save(os.path.join(outputPath, str(frameCounter + args.sf * batchIndex).zfill(8) + ".png"))
